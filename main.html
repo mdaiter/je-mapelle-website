@@ -1,0 +1,180 @@
+<html>
+	<head>
+		<style>
+			body{
+				margin: 0;
+			}
+			canvas{
+				width: 100%;
+				height: 100%
+			}
+		</style>
+		<script src="./three.js/build/three.min.js"></script>
+		<script src="./video.js"></script>
+	</head>
+	<body>
+		<div class="contents" id="mainContents">
+		</div>
+		<script src="./webgl-2d.js"></script>
+		<script>
+			// Set up camera stuff
+			var manualControl = false;
+			var longitude = 0;
+			var latitude = 0;
+
+			const savedLongitudes = [
+				10,
+				19,
+				20,
+				20
+			];
+
+			const savedLatitudes = [
+				-15,
+				15,
+				20,
+				20
+			];
+
+			const savedXs = [
+				10,
+				20,
+				20,
+				20
+			];
+
+			const savedYs = [
+				15,
+				15,
+				20,
+				20
+			];
+
+			const listOfMovies = [
+				"videos/Whitney_GPU.mp4",
+				"videos/Office_GPU.mp4",
+				"videos/fleur liggen_GPU.mp4",
+				"videos/Kijken_GPU.mp4"
+			];
+
+			const listOfMoviesPreloaded = listOfMovies.map(function (name) {
+				document.createElement("video").src = name;
+			});
+
+			var currentMovie = 0;
+
+			// setting up the renderer
+			renderer = new THREE.WebGLRenderer();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.getElementById("mainContents").appendChild(renderer.domElement);
+
+			// Attempt at rendering 2D object
+			WebGL2D.enable(renderer.domElement);
+
+			// creating a new scene
+			var scene = new THREE.Scene();
+			
+			// adding a camera
+			const camera = new THREE.PerspectiveCamera(300, window.innerWidth / window.innerHeight, 1, 1000);
+			camera.setLens(10);
+			camera.target = new THREE.Vector3(0, 0, 0);
+
+			// creation of a big sphere geometry
+			var sphere = new THREE.SphereGeometry(750, 100, 40, Math.PI/2, Math.PI*2, 0);
+			sphere.applyMatrix(new THREE.Matrix4().makeScale(-1, 1, 1));
+
+			// creation of the sphere material
+			var sphereMaterial = new THREE.MeshBasicMaterial();
+			var videoTexture = new THREEx.VideoTexture(listOfMovies[0]);
+			sphereMaterial.map = videoTexture.texture;
+
+			// geometry + material = mesh (actual object)
+			var sphereMesh = new THREE.Mesh(sphere, sphereMaterial);
+			scene.add(sphereMesh);
+
+			// listeners
+			document.addEventListener("mousedown", onDocumentMouseDown, false);
+			document.addEventListener("mousemove", onDocumentMouseMove, false);
+			document.addEventListener("mouseup", onDocumentMouseUp, false);
+			document.addEventListener("click", onDocumentMouseClick, false);
+			
+			var canvasInput = renderer.domElement;
+	
+			const textPerFrame = [
+				"Hi there",
+				"These are samples",
+				"I swear",
+				"It's not live"
+			];
+
+			const positionTextPerFrame = [
+				[200, 200],
+				[150, 150],
+				[400, 400],
+				[500, 500]
+			];
+
+			const text2 = document.createElement('div');
+			text2.style.position = 'absolute';
+			//text2.style.zIndex = 1;    // if you still don't see the label, try uncommenting this
+			text2.style.width = 100;
+			text2.style.height = 100;
+			text2.innerHTML = textPerFrame[currentMovie];
+			text2.style.top = positionTextPerFrame[currentMovie][0] + 'px';
+			text2.style.left = positionTextPerFrame[currentMovie][1] + 'px';
+			document.body.appendChild(text2);
+		
+			var lastTimeMsec = null;
+			requestAnimationFrame(function render(nowMsec) {
+				requestAnimationFrame(render);
+
+				// Draw faces
+				const context = renderer.domElement.getContext('webgl-2d');	
+				context.clearRect(0, 0, renderer.domElement.width, renderer.domElement.height);
+				const domE = renderer.domElement;
+
+				lastTimeMsec = lastTimeMsec || nowMsec-1000/60;
+				var deltaMsec	= Math.min(200, nowMsec - lastTimeMsec);
+				lastTimeMsec	= nowMsec;
+				videoTexture.update(deltaMsec/1000, nowMsec/1000);
+
+				// limiting latitude from -85 to 85 (cannot point to the sky or under your feet)
+                latitude = Math.max(-85, Math.min(85, latitude));
+
+				// moving the camera according to current latitude (vertical movement) and longitude (horizontal movement)
+				camera.target.x = 500 * Math.sin(THREE.Math.degToRad(90 - latitude)) * Math.cos(THREE.Math.degToRad(longitude));
+				camera.target.y = 500 * Math.cos(THREE.Math.degToRad(90 - latitude));
+				camera.target.z = 500 * Math.sin(THREE.Math.degToRad(90 - latitude)) * Math.sin(THREE.Math.degToRad(longitude));
+				camera.lookAt(camera.target);
+				
+				// calling again render function
+				renderer.render(scene, camera);
+			});
+			// when the mouse is pressed, we switch to manual control and save current coordinates
+			function onDocumentMouseDown(event){
+				event.preventDefault();
+			}
+
+			// when the mouse moves, if in manual contro we adjust coordinates
+			function onDocumentMouseMove(event){
+				if ((longitude % 360 < 20 || savedXs[currentMovie] - event.clientX < 0) && (longitude % 360 > -180 || savedXs[currentMovie] - event.clientX > 0))
+					longitude = (savedXs[currentMovie] - event.clientX) * 0.1 + savedLongitudes[currentMovie];
+				if ((latitude % 360 < 20 || savedYs[currentMovie] - event.clientY > 0) && (latitude % 360 > -10 || savedYs[currentMovie] - event.clientY < 0))
+					latitude = (event.clientY - savedYs[currentMovie]) * 0.1 + savedLatitudes[currentMovie];
+			}
+
+			// when the mouse is released, we turn manual control off
+			function onDocumentMouseUp(event){
+			
+			}
+
+			function onDocumentMouseClick(event) {
+				currentMovie === 3 ? currentMovie = 0 : currentMovie++;
+				videoTexture.video.src = listOfMovies[currentMovie]; 
+				text2.innerHTML = textPerFrame[currentMovie];
+			text2.style.top = positionTextPerFrame[currentMovie][0] + 'px';
+			text2.style.left = positionTextPerFrame[currentMovie][1] + 'px';
+			}
+		</script>
+	</body>
+</html>
